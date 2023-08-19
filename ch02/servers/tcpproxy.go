@@ -7,13 +7,13 @@ import (
 )
 
 func forward(src net.Conn) {
-	if dst, err := net.Dial("tcp", "google.com:80"); err == nil {
+	if dst, err := net.Dial("tcp", "mehrzadco.com:80"); err == nil {
 		defer dst.Close()
 		go func() {
 			if _, err := io.Copy(dst, src); err != nil {
 				log.Fatalln("Cannot forward data to the target:", err)
 			}
-		} ()
+		}()
 
 		if _, err := io.Copy(src, dst); err != nil {
 			log.Fatalln("Cannot return data from target to the you:", err)
@@ -25,7 +25,7 @@ func forward(src net.Conn) {
 }
 
 func main() {
-	if listener, err := net.Listen("tcp", ":80"); err == nil {
+	if listener, err := net.Listen("tcp", ":8000"); err == nil {
 		log.Println("TCP Server is up and listening...")
 		for {
 			if connection, err := listener.Accept(); err == nil {
