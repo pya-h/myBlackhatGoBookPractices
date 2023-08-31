@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -23,14 +25,40 @@ func ExtractResponse(res *http.Response) {
 	fmt.Println("-----------------------------------------------------------------------------------------------------")
 }
 
+type CustomResponse struct {
+	Code int
+	Message string
+}
+
+func ParseResponse(body io.Reader) (res CustomResponse, err error) {
+	err = json.NewDecoder(body).Decode(&res)
+	return
+}
+
 func main() {
-	if res, err := http.Get("http://google.com/robots.txt"); err == nil {
+	if res, err := http.Get("http://localhost:4000/"); err == nil {
+
 		defer res.Body.Close()
-		ExtractResponse(res)
+		if res, err := ParseResponse(res.Body); err == nil {
+			log.Println("Decoded Json from Get on localhost:", res)
+		} else {
+			log.Println(err)
+		}
+
 	} else {
 		log.Println("GET:", err)
 	}
-
+	testBody := CustomResponse{666, "Im being posted yey!"}
+	encoded, _ := json.Marshal(testBody)
+	if res, err := http.Post("http://localhost:4000",
+		"application/json", strings.NewReader(string(encoded))); err == nil {
+		defer res.Body.Close()
+		if res, err := ParseResponse(res.Body); err == nil {
+			log.Println("Decoded Json From Post on localhost: ", res)
+		} else {
+			log.Println(err)
+		}
+	}
 	if res, err := http.Head("http://google.com/robots.txt"); err == nil {
 		// response Body is of type ReadCloser
 		// u need to close it after using
