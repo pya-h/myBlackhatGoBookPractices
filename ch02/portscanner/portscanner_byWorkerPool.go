@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"net"
 	"sort"
+	"flag"
 )
 
-func WorkerPool(address *string, ports chan int16, results chan int16) {
+func WorkerPool(address *string, ports chan uint16, results chan uint16, progress_trigger chan bool) {
 	for port := range ports {
 		if connection, err := net.Dial("tcp", fmt.Sprintf("%s:%d", *address, port)); err == nil {
 			results <- port
@@ -14,6 +15,7 @@ func WorkerPool(address *string, ports chan int16, results chan int16) {
 		} else {
 			results <- 0
 		}
+		progress_trigger <- true
 	}
 
 }
@@ -30,50 +32,72 @@ func LoadingBar(load chan bool) {
 		i++
 	}
 }
+
+func UpdateProgress(number_of_ports uint16 , trigger chan bool) {
+	checked_ports := uint16(0)
+	var triggered bool
+	for {
+		triggered = <- trigger
+		if triggered {
+			checked_ports++
+		}
+		fmt.Printf("\b\b\b\b\b\b\b%5.2f %%", 100 * float32(checked_ports) / float32(number_of_ports))
+	}
+}
+
 func main() {
-	var address string
-	const LAST_PORT int16 = 1024
-	fmt.Print("Target Address: ")
-	fmt.Scanln(&address)
+	address := flag.String("a", "localhost", "Host address")
+	first_port := flag.Int("f", 1, "First port")
+	last_port := flag.Int("l", 1024, "Last port")
+	
+	flag.Parse()
+	fmt.Println("Search started on:", *address, ", Ports:", *first_port, "->", *last_port)
 	// The higher the count of workers(100 here), the faster your program should execute. But if you add too many
 		//workers, your results could become unreliable
-	ports := make(chan int16, 100)
-	results := make(chan int16)
+	ports := make(chan uint16, 100)
+	results := make(chan uint16)
 	// start goroutines waiting for channel
 	capacity := int8(cap(ports))
+	progress_trigger := make(chan bool)
+	go UpdateProgress(uint16(*last_port - *first_port), progress_trigger)
+
+	fmt.Print("Progress:  0.00 %")
 	for i := int8(0); i < capacity; i++ {
-		go WorkerPool(&address, ports, results)  // create 100 go routines, which their execution is blocked on for loop, 
+		go WorkerPool(address, ports, results, progress_trigger)  // create 100 go routines, which their execution is blocked on for loop, 
 		// until something is sent to the channel
 	}
-	fmt.Print("Scanning ")
-	load := make(chan bool)
-	go LoadingBar(load)
+	//load := make(chan bool)
+	//go LoadingBar(load)
 
 	go func() {
 		// this must be go routine so that results channel can be handled in the next lines
-		for i := int16(1); i <= LAST_PORT; i++ {
+		for i := *first_port; i <= *last_port; i++ {
 			// sending data to then channel 
-			ports <- i
+			ports <- uint16(i)
 		}
 	} ()
 
-	var openPorts []int16
-	for i := int16(1); i <= LAST_PORT; i++ {
+	var openPorts []uint16
+	for i := *first_port; i <= *last_port; i++ {
 		port := <-results
-		load <- true
+		//load <- true
 		if port > 0 {
 			openPorts = append(openPorts, port)
 		}
 
 	}
-	close(load)
+	// close(load)
 	close(results)
 	close(ports)
-	fmt.Println("\nDone")
+	// close(progress_trigger)
 	// sort.Ints(openPorts as  int)
 	sort.Slice(openPorts, func(i, j int) bool { return openPorts[i] < openPorts[j]})
-
-	for _, port := range openPorts {
-		fmt.Printf("%d is open\n", port)
+	fmt.Println()
+	for index, port := range openPorts {
+		fmt.Printf("%d\t", port)
+		if (index+1) % 5 == 0 {
+			fmt.Println()
+		}
 	}
+	fmt.Println()
 }
